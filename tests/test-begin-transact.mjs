@@ -1,5 +1,6 @@
 import {setupTestContext} from "velor-utils/test/setupTestContext.mjs";
 import sinon from "sinon";
+import {beginTransact} from "../database/beginTransact.mjs";
 
 const {
     expect,
@@ -28,33 +29,34 @@ describe('beginTransact', function() {
 
     describe('begin transaction', function() {
         it('should call BEGIN query on client', async function() {
-            await beginTransactFct(client);
+            await beginTransact(client);
 
-            expect(client.query.calledOnceWithExactly('BEGIN')).to.be.true;
+            expect(client.query).calledOnceWith('BEGIN');
         });
 
         it('should release client when an error occurs', async function() {
             client.query.rejects(new Error('Fake Error'));
 
             try {
-                await beginTransactFct(client);
+                await beginTransact(client);
+                throw new Error('should not get here')
             } catch (e) {
                 expect(e).to.be.instanceOf(Error);
                 expect(e.message).to.equal('Fake Error');
-                expect(client.release.calledOnce).to.be.true;
+                expect(client.release).calledOnce;
             }
         });
     });
 
     describe('commit transaction', function() {
         beforeEach(async function() {
-            transaction = await beginTransactFct(client);
+            transaction = await beginTransact(client);
         });
 
         it('should call COMMIT query on client', async function() {
             await transaction.commit();
 
-            expect(client.query.calledOnceWithExactly('COMMIT')).to.be.true;
+            expect(client.query).calledWithExactly('COMMIT');
         });
 
         it('should release client even if an error happens', async function() {
@@ -62,23 +64,24 @@ describe('beginTransact', function() {
 
             try {
                 await transaction.commit();
+                throw new Error('should not get here')
             } catch (e) {
                 expect(e).to.be.instanceOf(Error);
                 expect(e.message).to.equal('Fake Error');
-                expect(client.release.calledOnce).to.be.true;
+                expect(client.release).calledOnce;
             }
         });
     });
 
     describe('rollback transaction', function() {
         beforeEach(async function() {
-            transaction = await beginTransactFct(client);
+            transaction = await beginTransact(client);
         });
 
         it('should call ROLLBACK query on client', async function() {
             await transaction.rollback();
 
-            expect(client.query.calledOnceWithExactly('ROLLBACK')).to.be.true;
+            expect(client.query).calledWithExactly('ROLLBACK');
         });
 
         it('should release client even if an error happens', async function() {
@@ -86,10 +89,11 @@ describe('beginTransact', function() {
 
             try {
                 await transaction.rollback();
+                throw new Error('should not get here')
             } catch (e) {
                 expect(e).to.be.instanceOf(Error);
                 expect(e.message).to.equal('Fake Error');
-                expect(client.release.calledOnce).to.be.true;
+                expect(client.release).calledOnce;
             }
         });
     });

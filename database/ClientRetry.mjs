@@ -1,4 +1,4 @@
-import {retry} from "../../velor-utils/utils/functional.mjs";
+import {retry} from "velor-utils/utils/functional.mjs";
 
 export class ClientRetry {
     constructor(client) {

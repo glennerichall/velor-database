@@ -12,7 +12,8 @@
     "chai-as-promised": "^8.0.0",
     "chai-exclude": "^3.0.0",
     "playwright": "^1.48.1",
-    "sinon": "^19.0.2"
+    "sinon": "^19.0.2",
+    "sinon-chai": "^4.0.0"
   },
   "dependencies": {
     "velor-utils": "github:glennerichall/velor-utils"

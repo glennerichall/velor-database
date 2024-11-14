@@ -1,6 +1,6 @@
-import {bindOnAfterMethods} from "../../velor-utils/utils/proxy.mjs";
-import {isTrue} from "../../velor-utils/utils/predicates.mjs";
-import {retry} from "../../velor-utils/utils/functional.mjs";
+import {bindOnAfterMethods} from "velor-utils/utils/proxy.mjs";
+import {isTrue} from "velor-utils/utils/predicates.mjs";
+import {retry} from "velor-utils/utils/functional.mjs";
 
 import {ClientRetry} from "./ClientRetry.mjs";
 import {ClientProfiler} from "./ClientProfiler.mjs";
@@ -10,7 +10,7 @@ import {createConnectionPool as createConnectionPoolFct} from "./impl/postgres.m
 import {beginTransact as beginTransactFct} from "./beginTransact.mjs";
 import {queryRaw as queryRawFct} from "./queryRaw.mjs";
 import {bindStatements as bindStatementsFct} from "./bindStatements.mjs";
-import {noOpLogger} from "../../velor-utils/utils/noOpLogger.mjs";
+import {noOpLogger} from "velor-utils/utils/noOpLogger.mjs";
 
 export const databaseManagerPolicy = ({
                                                logQueries = isTrue(process.env.LOG_DATABASE_QUERIES),
