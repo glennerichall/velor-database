@@ -13,13 +13,13 @@ import {bindStatements as bindStatementsFct} from "./bindStatements.mjs";
 import {noOpLogger} from "velor-utils/utils/noOpLogger.mjs";
 
 export const databaseManagerPolicy = ({
-                                               logQueries = isTrue(process.env.LOG_DATABASE_QUERIES),
-                                               createConnectionPool = createConnectionPoolFct,
-                                               beginTransact = beginTransactFct,
-                                               bindStatements = bindStatementsFct,
-                                               queryRaw = queryRawFct,
-                                               getLogger = () => noOpLogger
-                                           } = {}) => {
+                                          logQueries = isTrue(process.env.LOG_DATABASE_QUERIES),
+                                          createConnectionPool = createConnectionPoolFct,
+                                          beginTransact = beginTransactFct,
+                                          bindStatements = bindStatementsFct,
+                                          queryRaw = queryRawFct,
+                                          getLogger = () => noOpLogger
+                                      } = {}) => {
     return class DatabaseManager {
         #pool;
         #acquiredCount;
@@ -46,6 +46,11 @@ export const databaseManagerPolicy = ({
         }
 
         initialize() {
+
+            if (!this.#boundStatements) {
+                throw new Error("Missing boundStatements");
+            }
+
             const statements = this.#boundStatements;
 
             statements.queryRaw = async (query, args) => {
@@ -186,14 +191,18 @@ export const databaseManagerPolicy = ({
 
         async closeDBClientPool() {
             if (this.#pool === null) return;
+
             await retry(() => {
                 return this.#acquiredCount === 0 &&
                     this.#pool.waitingCount === 0;
             }, {retry: 3});
+
             await this.#pool.end();
+
             await retry(() => {
                 return this.#pool.idleCount === 0;
             }, {retry: 3});
+
             this.#pool = null;
             this.#acquiredCount = 0;
         }

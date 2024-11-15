@@ -16,6 +16,7 @@
     "sinon-chai": "^4.0.0"
   },
   "dependencies": {
+    "pg": "^8.13.1",
     "velor-utils": "github:glennerichall/velor-utils"
   }
 }
