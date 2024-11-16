@@ -153,6 +153,7 @@ describe('DatabaseManager', function () {
 
     describe('getConnectionPool', () => {
         it('connect() should correctly call getConnectionPool', function () {
+            const dbManager = new DatabaseManagerMock();
             const getConnectionPoolSpy = sinon.stub(dbManager, 'getConnectionPool');
             dbManager.connect();
             expect(getConnectionPoolSpy).to.have.been.called;
