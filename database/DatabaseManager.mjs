@@ -1,41 +1,36 @@
 import {bindOnAfterMethods} from "velor-utils/utils/proxy.mjs";
 import {isTrue} from "velor-utils/utils/predicates.mjs";
-import {retry} from "velor-utils/utils/functional.mjs";
-
-import {createConnectionPool as createConnectionPoolFct} from "./impl/postgres.mjs";
 import {beginTransact as beginTransactFct} from "./beginTransact.mjs";
 import {queryRaw as queryRawFct} from "./queryRaw.mjs";
 import {bindStatements as bindStatementsFct} from "./bindStatements.mjs";
 import {noOpLogger} from "velor-utils/utils/noOpLogger.mjs";
-import {acquireClient} from "./acquireClient.mjs";
+import {poolManagerPolicy} from "./PoolManager.mjs";
 
 export const databaseManagerPolicy = ({
                                           logQueries = isTrue(process.env.LOG_DATABASE_QUERIES),
-                                          createConnectionPool = createConnectionPoolFct,
                                           beginTransact = beginTransactFct,
                                           bindStatements = bindStatementsFct,
                                           queryRaw = queryRawFct,
-                                          getLogger = () => noOpLogger
+                                          getLogger = () => noOpLogger,
+                                          ...others
                                       } = {}) => {
-    return class DatabaseManager {
-        #pool;
-        #acquiredCount;
+    return class DatabaseManager extends poolManagerPolicy({
+        logQueries,
+        ...others,
+    }) {
         #boundStatements;
         #rawStatements;
         #database;
         #transact;
         #schema;
-        #connectionString;
 
         constructor(schema, connectionString) {
-            this.#pool = null;
-            this.#acquiredCount = 0;
+            super(connectionString);
             this.#boundStatements = null;
             this.#rawStatements = null;
             this.#database = null;
             this.#transact = null;
             this.#schema = schema;
-            this.#connectionString = connectionString;
         }
 
         get schema() {
@@ -131,35 +126,6 @@ export const databaseManagerPolicy = ({
             return this.#database;
         }
 
-        connect() {
-            this.getConnectionPool();
-        }
-
-        getConnectionPool() {
-            if (this.#pool === null) {
-                getLogger(this).debug(`Creating database connection pool [${this.schema}]`);
-                this.#pool = createConnectionPool(this.#connectionString)
-
-                this.#pool.on('acquire', () => {
-                    this.#acquiredCount++;
-                    getLogger(this).silly('Database client acquired [${this.schema}]: ' + this.#acquiredCount);
-                });
-                this.#pool.on('release', () => {
-                    this.#acquiredCount--;
-                    getLogger(this).silly('Database client released [${this.schema}]: ' + this.#acquiredCount);
-                });
-            }
-            return this.#pool;
-        }
-
-        async acquireClient() {
-            return await acquireClient(this.getConnectionPool(),
-                {
-                    logQueries,
-                    logger: getLogger(this)
-                });
-        }
-
         bindStatements(statements) {
             let schema = this.schema;
             this.#rawStatements = statements;
@@ -167,28 +133,6 @@ export const databaseManagerPolicy = ({
             return this;
         }
 
-        async close() {
-            // alias
-            return this.closeDBClientPool();
-        }
-
-        async closeDBClientPool() {
-            if (this.#pool === null) return;
-
-            await retry(() => {
-                return this.#acquiredCount === 0 &&
-                    this.#pool.waitingCount === 0;
-            }, {retry: 3});
-
-            await this.#pool.end();
-
-            await retry(() => {
-                return this.#pool.idleCount === 0;
-            }, {retry: 3});
-
-            this.#pool = null;
-            this.#acquiredCount = 0;
-        }
     }
 }
 
