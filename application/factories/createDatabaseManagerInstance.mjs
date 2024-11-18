@@ -1,5 +1,6 @@
 import {
     getEnvValue,
+    getEnvValueIndirect,
     getNodeEnv,
     getProvider
 } from "velor-services/injection/baseServices.mjs";
@@ -15,7 +16,7 @@ import {s_databaseStatements} from "../services/databaseServiceKeys.mjs";
 export function createDatabaseManagerInstance(services) {
     let schema = getEnvValue(services, DATABASE_SCHEMA);
     let connectionString = getEnvValue(services, DATABASE_CONNECTION_STRING) ??
-        getEnvValue(services, DATABASE_URL_VAR);
+        getEnvValueIndirect(services, DATABASE_URL_VAR);
 
     if (getNodeEnv(services) === ENV_TEST) {
         connectionString += "?sslmode=disable";

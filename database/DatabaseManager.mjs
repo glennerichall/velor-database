@@ -2,15 +2,12 @@ import {bindOnAfterMethods} from "velor-utils/utils/proxy.mjs";
 import {isTrue} from "velor-utils/utils/predicates.mjs";
 import {retry} from "velor-utils/utils/functional.mjs";
 
-import {ClientRetry} from "./ClientRetry.mjs";
-import {ClientProfiler} from "./ClientProfiler.mjs";
-import {ClientLogger} from "./ClientLogger.mjs";
-
 import {createConnectionPool as createConnectionPoolFct} from "./impl/postgres.mjs";
 import {beginTransact as beginTransactFct} from "./beginTransact.mjs";
 import {queryRaw as queryRawFct} from "./queryRaw.mjs";
 import {bindStatements as bindStatementsFct} from "./bindStatements.mjs";
 import {noOpLogger} from "velor-utils/utils/noOpLogger.mjs";
+import {acquireClient} from "./acquireClient.mjs";
 
 export const databaseManagerPolicy = ({
                                           logQueries = isTrue(process.env.LOG_DATABASE_QUERIES),
@@ -156,25 +153,11 @@ export const databaseManagerPolicy = ({
         }
 
         async acquireClient() {
-            try {
-                let client = await retry(() => this.getConnectionPool().connect(), {
-                    retry: (error, i) => {
-                        let isTooManyClients = error.code === '53300';
-                        if (isTooManyClients) {
-                            getLogger(this).debug(`Too many clients already, retrying(${i}) connection to database`);
-                        }
-                        return (isTooManyClients) && i < 3;
-                    }
+            return await acquireClient(this.getConnectionPool(),
+                {
+                    logQueries,
+                    logger: getLogger(this)
                 });
-                client = new ClientRetry(client);
-                if (logQueries) {
-                    return new ClientLogger(client, getLogger(this));
-                }
-                return new ClientProfiler(client);
-            } catch (e) {
-                getLogger(this).debug(e);
-                throw e;
-            }
         }
 
         bindStatements(statements) {
