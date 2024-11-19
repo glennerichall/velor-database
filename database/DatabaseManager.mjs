@@ -1,31 +1,25 @@
 import {bindOnAfterMethods} from "velor-utils/utils/proxy.mjs";
-import {isTrue} from "velor-utils/utils/predicates.mjs";
 import {beginTransact as beginTransactFct} from "./beginTransact.mjs";
 import {queryRaw as queryRawFct} from "./queryRaw.mjs";
 import {bindStatements as bindStatementsFct} from "./bindStatements.mjs";
 import {noOpLogger} from "velor-utils/utils/noOpLogger.mjs";
-import {poolManagerPolicy} from "./PoolManager.mjs";
 
 export const databaseManagerPolicy = ({
-                                          logQueries = isTrue(process.env.LOG_DATABASE_QUERIES),
                                           beginTransact = beginTransactFct,
                                           bindStatements = bindStatementsFct,
                                           queryRaw = queryRawFct,
                                           getLogger = () => noOpLogger,
-                                          ...others
                                       } = {}) => {
-    return class DatabaseManager extends poolManagerPolicy({
-        logQueries,
-        ...others,
-    }) {
+    return class DatabaseManager {
         #boundStatements;
         #rawStatements;
         #database;
         #transact;
         #schema;
+        #pool;
 
-        constructor(schema, connectionString) {
-            super(connectionString);
+        constructor(schema, pool) {
+            this.#pool = pool;
             this.#boundStatements = null;
             this.#rawStatements = null;
             this.#database = null;
@@ -37,6 +31,10 @@ export const databaseManagerPolicy = ({
             return this.#schema;
         }
 
+        connect() {
+            return this.#pool.connect();
+        }
+
         initialize() {
 
             if (!this.#boundStatements) {
@@ -46,7 +44,7 @@ export const databaseManagerPolicy = ({
             const statements = this.#boundStatements;
 
             statements.queryRaw = async (query, args) => {
-                const client = await this.acquireClient();
+                const client = await this.#pool.acquireClient();
                 try {
                     return queryRaw(client, query, args, getLogger(this));
                 } finally {
@@ -54,10 +52,10 @@ export const databaseManagerPolicy = ({
                 }
             };
 
-            statements.close = () => this.closeDBClientPool();
+            statements.close = () => this.#pool.closeDBClientPool();
 
             statements.beginTransact = async () => {
-                const client = await this.acquireClient();
+                const client = await this.#pool.acquireClient();
                 // bind statements with schema and client but do not auto-release client
                 // as it will be reused in the current transaction.
                 const statements = bindStatements(this.#rawStatements, this.schema, client);

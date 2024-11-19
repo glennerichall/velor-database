@@ -12,6 +12,7 @@ import {
 import {ENV_TEST} from "velor-utils/env.mjs";
 import {DatabaseManager} from "../../database/DatabaseManager.mjs";
 import {s_databaseStatements} from "../services/databaseServiceKeys.mjs";
+import {PoolManager} from "../../database/PoolManager.mjs";
 
 export function createDatabaseManagerInstance(services) {
     let schema = getEnvValue(services, DATABASE_SCHEMA);
@@ -22,8 +23,10 @@ export function createDatabaseManagerInstance(services) {
         connectionString += "?sslmode=disable";
     }
 
+    const pool = new PoolManager(connectionString);
+
     const statements = getProvider(services)[s_databaseStatements]();
 
-    let manager = new DatabaseManager(schema, connectionString);
+    let manager = new DatabaseManager(schema, pool);
     return manager.bindStatements(statements);
 }
