@@ -6,6 +6,7 @@ import {ClientProfiler} from "../database/ClientProfiler.mjs";
 import {noOpLogger} from "velor-utils/utils/noOpLogger.mjs";
 import {timeoutAsync} from "velor-utils/utils/sync.mjs";
 import {noOp} from "velor-utils/utils/functional.mjs";
+import {poolManagerPolicy} from "../database/PoolManager.mjs";
 
 const {
     expect,
@@ -78,12 +79,8 @@ describe('DatabaseManager', function () {
 
     describe('acquireClient', () => {
         it('Should correctly create ClientLogger object when logQueries is true', async function () {
-            let DatabaseManager = databaseManagerPolicy({
-                logQueries: true, createConnectionPool, beginTransact,
-                bindStatements, queryRaw, getLogger
-            });
-
-            dbManager = new DatabaseManager('schema', 'connection');
+            const PoolManagerMock = poolManagerPolicy({logQueries: true, createConnectionPool});
+            const pool = new PoolManagerMock( 'connection');
 
             createConnectionPool.returns({
                 on() {
@@ -92,12 +89,13 @@ describe('DatabaseManager', function () {
                     return {}
                 }
             })
-            const acquireClientResult = await dbManager.acquireClient();
+            const acquireClientResult = await pool.acquireClient();
             expect(acquireClientResult).to.be.instanceOf(ClientLogger);
         });
 
         it('Should correctly create ClientProfiler object when logQueries is false', async function () {
-            dbManager = new DatabaseManagerMock('schema', 'connection');
+            const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
+            const pool = new PoolManagerMock( 'connection');
             createConnectionPool.returns({
                 on() {
                 },
@@ -105,15 +103,16 @@ describe('DatabaseManager', function () {
                     return {}
                 }
             })
-            const acquireClientResult = await dbManager.acquireClient();
+            const acquireClientResult = await pool.acquireClient();
             expect(acquireClientResult).to.be.instanceOf(ClientProfiler);
         });
 
         it('Should throw exception when getConnectionPool.connect throws an exception', async function () {
-            dbManager = new DatabaseManagerMock('schema', 'connection');
+            const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
+            const pool = new PoolManagerMock( 'connection');
             const testError = new Error("Test Exception");
 
-            sinon.stub(dbManager, "getConnectionPool").returns({
+            sinon.stub(pool, "getConnectionPool").returns({
                 connect: () => {
                     throw testError;
                 }
@@ -121,7 +120,7 @@ describe('DatabaseManager', function () {
 
             let error;
             try {
-                await dbManager.acquireClient();
+                await pool.acquireClient();
             } catch (e) {
                 error = e;
             }
@@ -147,32 +146,35 @@ describe('DatabaseManager', function () {
     });
 
     it('Should not throw on close pool if pool is null', async function () {
-        const dbManager = new DatabaseManagerMock('schema', 'connection');
-        dbManager.closeDBClientPool();
+        const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
+        const pool = new PoolManagerMock( 'connection');
+        await pool.closeDBClientPool();
     });
 
     describe('getConnectionPool', () => {
         it('connect() should correctly call getConnectionPool', function () {
-            const dbManager = new DatabaseManagerMock();
-            const getConnectionPoolSpy = sinon.stub(dbManager, 'getConnectionPool');
-            dbManager.connect();
+            const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
+            const pool = new PoolManagerMock( 'connection');
+            const getConnectionPoolSpy = sinon.stub(pool, 'getConnectionPool');
+            pool.connect();
             expect(getConnectionPoolSpy).to.have.been.called;
         });
 
         it('Should correctly get a connection pool if not present', function () {
-            const dbManager = new DatabaseManagerMock('schema', 'connection');
+            const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
+            const pool = new PoolManagerMock( 'connection');
             createConnectionPool.returns({
                 on() {
                 }
             })
-            dbManager.getConnectionPool();
-            dbManager.getConnectionPool();
+            pool.getConnectionPool();
+            pool.getConnectionPool();
             expect(createConnectionPool).calledOnce;
         });
 
         it('Should not retry connection pool connection on client acquire if unknown error', async function () {
-            // Create a instance
-            const dbManager = new DatabaseManagerMock('schema', 'connection');
+            const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
+            const pool = new PoolManagerMock( 'connection');
 
             let err = new Error();
             let connect = sinon.stub().throws(err);
@@ -183,7 +185,7 @@ describe('DatabaseManager', function () {
             })
             let error;
             try {
-                await dbManager.acquireClient();
+                await pool.acquireClient();
             } catch (e) {
                 error = e;
             }
@@ -195,8 +197,8 @@ describe('DatabaseManager', function () {
         });
 
         it('Should retry connection pool connection on client acquire', async function () {
-            // Create a instance
-            const dbManager = new DatabaseManagerMock('schema', 'connection');
+            const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
+            const pool = new PoolManagerMock( 'connection');
 
             let err = new Error();
             err.code = '53300';
@@ -207,13 +209,14 @@ describe('DatabaseManager', function () {
                     .onSecondCall().throws(err)
                     .onThirdCall().resolves()
             })
-            let client = dbManager.acquireClient();
+            let client = pool.acquireClient();
             expect(client).to.not.be.null;
 
         });
 
         it('Should retry connection pool connection at ax 3 times on client acquire', async function () {
-            const dbManager = new DatabaseManagerMock('schema', 'connection');
+            const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
+            const pool = new PoolManagerMock( 'connection');
 
             let err = new Error();
             err.code = '53300';
@@ -226,7 +229,7 @@ describe('DatabaseManager', function () {
             })
             let error;
             try {
-                await dbManager.acquireClient();
+                await pool.acquireClient();
             } catch (e) {
                 error = e;
             }
@@ -242,10 +245,9 @@ describe('DatabaseManager', function () {
     describe('database', () => {
         let database, client;
         beforeEach(function () {
-            const DatabaseManagerMock = databaseManagerPolicy({
-                logQueries, createConnectionPool, getLogger
-            })
-            dbManager = new DatabaseManagerMock('schema-name', 'connection');
+            const DatabaseManagerMock = databaseManagerPolicy({getLogger})
+            const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
+            dbManager = new DatabaseManagerMock('schema-name', new PoolManagerMock( 'connection'));
             client = {
                 query: sinon.stub().resolves({
                     rows: [{}]
@@ -297,13 +299,13 @@ describe('DatabaseManager', function () {
         })
 
         it('should database close pool', async () => {
-            dbManager.bindStatements({});
-            database = dbManager.getDatabase();
+            const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
+            const pool = new PoolManagerMock( 'connection');
 
-            sinon.spy(dbManager, 'closeDBClientPool');
-            database.close();
+            sinon.spy(pool, 'closeDBClientPool');
+            pool.close();
 
-            expect(dbManager.closeDBClientPool).calledOnce;
+            expect(pool.closeDBClientPool).calledOnce;
         })
 
         describe('transact', () => {

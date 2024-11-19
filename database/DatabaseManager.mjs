@@ -127,7 +127,7 @@ export const databaseManagerPolicy = ({
         bindStatements(statements) {
             let schema = this.schema;
             this.#rawStatements = statements;
-            this.#boundStatements = bindStatements(statements, schema, () => this.acquireClient());
+            this.#boundStatements = bindStatements(statements, schema, () => this.#pool.acquireClient());
             return this;
         }
 
