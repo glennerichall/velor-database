@@ -337,9 +337,10 @@ describe('DatabaseManager', function () {
             })
 
             it('should call client with args', async () => {
+                let schema = 'schema-name';
                 let statements = {
                     users: {
-                        getUserByPlace: (client, schema, place) => {
+                        getUserByPlace: (client, place) => {
                             client.query(`select * from ${schema}.users where place = $1"`,
                                 [place])
                         },

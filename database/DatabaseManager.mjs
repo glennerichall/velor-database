@@ -58,7 +58,7 @@ export const databaseManagerPolicy = ({
                 const client = await this.#pool.acquireClient();
                 // bind statements with schema and client but do not auto-release client
                 // as it will be reused in the current transaction.
-                const statements = bindStatements(this.#rawStatements, this.schema, client);
+                const statements = bindStatements(this.#rawStatements, client);
                 let transactManager = await beginTransact(client);
 
                 let transact = {
@@ -125,9 +125,8 @@ export const databaseManagerPolicy = ({
         }
 
         bindStatements(statements) {
-            let schema = this.schema;
             this.#rawStatements = statements;
-            this.#boundStatements = bindStatements(statements, schema, () => this.#pool.acquireClient());
+            this.#boundStatements = bindStatements(statements, () => this.#pool.acquireClient());
             return this;
         }
 

@@ -35,16 +35,16 @@ describe('statement bindings', () => {
         });
 
         it('should call statement with client, schema and args', async function () {
-            const boundStatement = bindStatementAutoRelease(statement, schema, clientProvider);
+            const boundStatement = bindStatementAutoRelease(statement, clientProvider);
             const res = await boundStatement('arg1', 'arg2');
             expect(res).to.equal('execute statement');
-            expect(statement).calledOnceWith(client, schema, 'arg1', 'arg2');
+            expect(statement).calledOnceWith(client, 'arg1', 'arg2');
             expect(client.release).calledOnce;
         });
 
         it('should always release the client even if error occurs', async function () {
             statement.rejects(new Error('Fake Error'));
-            const boundStatement = bindStatementAutoRelease(statement, schema, clientProvider);
+            const boundStatement = bindStatementAutoRelease(statement, clientProvider);
             try {
                 await boundStatement('arg1', 'arg2');
                 throw new Error('should not get here')
@@ -70,10 +70,10 @@ describe('statement bindings', () => {
         });
 
         it('should call statement with client, schema and args', async function () {
-            const boundStatement = bindStatement(statement, schema, client);
+            const boundStatement = bindStatement(statement, client);
             const res = await boundStatement('arg1', 'arg2');
             expect(res).to.equal('execute statement');
-            expect(statement).calledOnceWith(client, schema, 'arg1', 'arg2');
+            expect(statement).calledOnceWith(client, 'arg1', 'arg2');
         });
     });
 
@@ -104,22 +104,22 @@ describe('statement bindings', () => {
         });
 
         it('should bind statements to client when client is an object', async function () {
-            const res = bindStatements(statements, schema, client);
+            const res = bindStatements(statements, client);
             expect(await res.group1.stmt1()).to.equal('execute statement1');
             expect(await res.group2.stmt2()).to.equal('execute statement2');
             expect(await res.group2.stmt3()).to.equal('execute statement3');
-            expect(statement1).to.have.been.calledOnceWithExactly(client, schema);
-            expect(statement2).to.have.been.calledOnceWithExactly(client, schema);
-            expect(statement3).to.have.been.calledOnceWithExactly(client, schema);
+            expect(statement1).to.have.been.calledOnceWithExactly(client);
+            expect(statement2).to.have.been.calledOnceWithExactly(client);
+            expect(statement3).to.have.been.calledOnceWithExactly(client);
         });
 
         it('should bind statements to client when client is a function', async function () {
             const clientProvider = sinon.stub().resolves(client);
-            const res = bindStatements(statements, schema, clientProvider);
+            const res = bindStatements(statements, clientProvider);
             expect(await res.group1.stmt1()).to.equal('execute statement1');
             expect(await res.group2.stmt2()).to.equal('execute statement2');
-            expect(statement1).to.have.been.calledOnceWithExactly(client, schema);
-            expect(statement2).to.have.been.calledOnceWithExactly(client, schema);
+            expect(statement1).to.have.been.calledOnceWithExactly(client);
+            expect(statement2).to.have.been.calledOnceWithExactly(client);
         });
     });
 

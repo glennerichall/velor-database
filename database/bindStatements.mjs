@@ -1,19 +1,19 @@
-export function bindStatementAutoRelease(statement, schema, clientProvider) {
+export function bindStatementAutoRelease(statement, clientProvider) {
     return async (...args) => {
         let client = await clientProvider();
         try {
-            return statement(client, schema, ...args);
+            return statement(client, ...args);
         } finally {
             client.release();
         }
     }
 }
 
-export function bindStatement(statement, schema, client) {
-    return (...args) => statement(client, schema, ...args);
+export function bindStatement(statement, client) {
+    return (...args) => statement(client, ...args);
 }
 
-export function bindStatements(statements, schema, clientOrProvider) {
+export function bindStatements(statements, clientOrProvider) {
 
     let bind = typeof clientOrProvider === 'function' ?
         bindStatementAutoRelease :
@@ -23,7 +23,7 @@ export function bindStatements(statements, schema, clientOrProvider) {
     for (let group in statements) {
         result[group] = {};
         for (let statement in statements[group]) {
-            result[group][statement] = bind(statements[group][statement], schema, clientOrProvider);
+            result[group][statement] = bind(statements[group][statement], clientOrProvider);
         }
     }
 
