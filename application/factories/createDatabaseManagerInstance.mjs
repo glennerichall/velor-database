@@ -1,11 +1,9 @@
-import {
-    getEnvValue,
-    getProvider
-} from "velor-services/injection/baseServices.mjs";
-import {DATABASE_SCHEMA,} from "../services/databaseEnvKeys.mjs";
+import {DATABASE_SCHEMA,} from "../services/envKeys.mjs";
 import {DatabaseManager} from "../../database/DatabaseManager.mjs";
-import {s_databaseStatements} from "../services/databaseServiceKeys.mjs";
-import {getPoolManager} from "../services/databaseServices.mjs";
+import {s_databaseStatements} from "../services/serviceKeys.mjs";
+import {getPoolManager} from "../services/services.mjs";
+import {getEnvValue} from "velor-services/application/services/baseServices.mjs";
+import {getProvider} from "velor-services/injection/ServicesContext.mjs";
 
 export function createDatabaseManagerInstance(services) {
     let schema = getEnvValue(services, DATABASE_SCHEMA);

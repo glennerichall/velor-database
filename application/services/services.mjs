@@ -1,9 +1,9 @@
-import {getProvider} from "velor-services/injection/baseServices.mjs";
+import {getProvider} from "velor-services/application/services/baseServices.mjs";
 
 import {
     s_database,
     s_poolManager,
-} from "./databaseServiceKeys.mjs";
+} from "./serviceKeys.mjs";
 
 export function getDatabase(services) {
     return getProvider(services)[s_database]();

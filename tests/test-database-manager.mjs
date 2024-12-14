@@ -80,7 +80,7 @@ describe('DatabaseManager', function () {
     describe('acquireClient', () => {
         it('Should correctly create ClientLogger object when logQueries is true', async function () {
             const PoolManagerMock = poolManagerPolicy({logQueries: true, createConnectionPool});
-            const pool = new PoolManagerMock( 'connection');
+            const pool = new PoolManagerMock('connection');
 
             createConnectionPool.returns({
                 on() {
@@ -95,7 +95,7 @@ describe('DatabaseManager', function () {
 
         it('Should correctly create ClientProfiler object when logQueries is false', async function () {
             const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
-            const pool = new PoolManagerMock( 'connection');
+            const pool = new PoolManagerMock('connection');
             createConnectionPool.returns({
                 on() {
                 },
@@ -109,7 +109,7 @@ describe('DatabaseManager', function () {
 
         it('Should throw exception when getConnectionPool.connect throws an exception', async function () {
             const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
-            const pool = new PoolManagerMock( 'connection');
+            const pool = new PoolManagerMock('connection');
             const testError = new Error("Test Exception");
 
             sinon.stub(pool, "getConnectionPool").returns({
@@ -147,14 +147,14 @@ describe('DatabaseManager', function () {
 
     it('Should not throw on close pool if pool is null', async function () {
         const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
-        const pool = new PoolManagerMock( 'connection');
+        const pool = new PoolManagerMock('connection');
         await pool.closeDBClientPool();
     });
 
     describe('getConnectionPool', () => {
         it('connect() should correctly call getConnectionPool', function () {
             const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
-            const pool = new PoolManagerMock( 'connection');
+            const pool = new PoolManagerMock('connection');
             const getConnectionPoolSpy = sinon.stub(pool, 'getConnectionPool');
             pool.connect();
             expect(getConnectionPoolSpy).to.have.been.called;
@@ -162,7 +162,7 @@ describe('DatabaseManager', function () {
 
         it('Should correctly get a connection pool if not present', function () {
             const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
-            const pool = new PoolManagerMock( 'connection');
+            const pool = new PoolManagerMock('connection');
             createConnectionPool.returns({
                 on() {
                 }
@@ -174,7 +174,7 @@ describe('DatabaseManager', function () {
 
         it('Should not retry connection pool connection on client acquire if unknown error', async function () {
             const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
-            const pool = new PoolManagerMock( 'connection');
+            const pool = new PoolManagerMock('connection');
 
             let err = new Error();
             let connect = sinon.stub().throws(err);
@@ -198,7 +198,7 @@ describe('DatabaseManager', function () {
 
         it('Should retry connection pool connection on client acquire', async function () {
             const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
-            const pool = new PoolManagerMock( 'connection');
+            const pool = new PoolManagerMock('connection');
 
             let err = new Error();
             err.code = '53300';
@@ -216,7 +216,7 @@ describe('DatabaseManager', function () {
 
         it('Should retry connection pool connection at ax 3 times on client acquire', async function () {
             const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
-            const pool = new PoolManagerMock( 'connection');
+            const pool = new PoolManagerMock('connection');
 
             let err = new Error();
             err.code = '53300';
@@ -247,7 +247,7 @@ describe('DatabaseManager', function () {
         beforeEach(function () {
             const DatabaseManagerMock = databaseManagerPolicy({getLogger})
             const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
-            dbManager = new DatabaseManagerMock('schema-name', new PoolManagerMock( 'connection'));
+            dbManager = new DatabaseManagerMock('schema-name', new PoolManagerMock('connection'));
             client = {
                 query: sinon.stub().resolves({
                     rows: [{}]
@@ -300,7 +300,7 @@ describe('DatabaseManager', function () {
 
         it('should database close pool', async () => {
             const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
-            const pool = new PoolManagerMock( 'connection');
+            const pool = new PoolManagerMock('connection');
 
             sinon.spy(pool, 'closeDBClientPool');
             pool.close();
@@ -431,7 +431,6 @@ describe('DatabaseManager', function () {
 
 
     })
-
 
 });
 
