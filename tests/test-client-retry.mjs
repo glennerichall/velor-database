@@ -1,6 +1,13 @@
 import {setupTestContext} from "velor-utils/test/setupTestContext.mjs";
 import sinon from "sinon";
 import {ClientRetry} from "../database/ClientRetry.mjs";
+import {s_logger} from "velor-services/application/services/serviceKeys.mjs";
+import {
+    getInstanceBinder,
+    getServiceBinder
+} from "velor-services/injection/ServicesContext.mjs";
+import {ClientProvider} from "../database/ClientProvider.mjs";
+import {s_poolManager} from "../application/services/serviceKeys.mjs";
 
 const {
     expect,
@@ -16,15 +23,38 @@ describe('ClientRetry', function () {
     let mockClient;
     let sandbox;
     let clientRetry;
-
-    beforeEach(function () {
+    let logger;
+    beforeEach(async () => {
         sandbox = sinon.createSandbox();
+        logger = {
+            debug: sinon.stub(),
+            warn: sinon.stub(),
+            error: sinon.stub(),
+        };
+
         mockClient = {
             query: sandbox.stub(),
             release: sandbox.stub(),
         };
-        clientRetry = new ClientRetry(mockClient);
-        sandbox.stub(console, 'debug');
+
+        let poolManager = {
+            connect: sinon.stub().resolves(mockClient)
+        };
+
+        let provider = getServiceBinder().createInstance(ClientProvider, {
+            profileQueries: true
+        });
+
+
+        getInstanceBinder(provider)
+            .setInstance(s_logger, logger)
+            .setInstance(s_poolManager, poolManager);
+
+        clientRetry = await provider.acquireClient();
+
+        getInstanceBinder(clientRetry)
+            .setInstance(s_logger, logger)
+
     });
 
     afterEach(function () {
@@ -41,7 +71,7 @@ describe('ClientRetry', function () {
             const result = await clientRetry.query('query', 'args');
             expect(result).to.equal('result');
             expect(mockClient.query).calledTwice;
-            expect(console.debug).to.have.been.calledWith('Deadlock detected, retrying request');
+            expect(logger.warn).to.have.been.calledWith('Deadlock detected, retrying request');
         });
 
         it('should not retry when non-deadlock error occurs', async function () {
@@ -69,7 +99,8 @@ describe('ClientRetry', function () {
                 error = e;
             }
             expect(error).to.be.an('error');
-            expect(console.debug).to.have.been.callCount(4);
+            expect(logger.warn).to.have.been.callCount(3);
+            expect(logger.error).to.have.been.callCount(2);
         });
     });
 

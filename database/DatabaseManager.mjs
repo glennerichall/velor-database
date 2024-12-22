@@ -1,29 +1,27 @@
-import {bindOnAfterMethods} from "velor-utils/utils/proxy.mjs";
 import {beginTransact as beginTransactFct} from "./beginTransact.mjs";
-import {queryRaw as queryRawFct} from "./queryRaw.mjs";
 import {bindStatements as bindStatementsFct} from "./bindStatements.mjs";
-import {noOpLogger} from "velor-utils/utils/noOpLogger.mjs";
+import {getLogger} from "velor-services/application/services/services.mjs";
+import {
+    getClientProvider,
+    getPoolManager
+} from "../application/services/services.mjs";
 
 export const databaseManagerPolicy = ({
                                           beginTransact = beginTransactFct,
                                           bindStatements = bindStatementsFct,
-                                          queryRaw = queryRawFct,
-                                          getLogger = () => noOpLogger,
                                       } = {}) => {
     return class DatabaseManager {
         #boundStatements;
         #rawStatements;
         #database;
-        #transact;
+        // #transact;
         #schema;
-        #pool;
 
-        constructor(schema, pool) {
-            this.#pool = pool;
+        constructor(schema) {
             this.#boundStatements = null;
             this.#rawStatements = null;
             this.#database = null;
-            this.#transact = null;
+            // this.#transact = null;
             this.#schema = schema;
         }
 
@@ -32,30 +30,30 @@ export const databaseManagerPolicy = ({
         }
 
         connect() {
-            return this.#pool.connect();
+            return getPoolManager(this).connect();
         }
 
-        initialize() {
+        #createDatabase() {
 
             if (!this.#boundStatements) {
                 throw new Error("Missing boundStatements");
             }
 
-            const statements = this.#boundStatements;
+            const database = this.#boundStatements;
 
-            statements.queryRaw = async (query, args) => {
-                const client = await this.#pool.acquireClient();
+            database.queryRaw = async (query, args) => {
+                const client = await getClientProvider(this).acquireClient();
                 try {
-                    return queryRaw(client, query, args, getLogger(this));
+                    return client.query(query, args);
                 } finally {
                     client.release();
                 }
             };
 
-            statements.close = () => this.#pool.closeDBClientPool();
+            database.close = () => getPoolManager(this).closeDBClientPool();
 
-            statements.beginTransact = async () => {
-                const client = await this.#pool.acquireClient();
+            database.beginTransact = async () => {
+                const client = await getClientProvider(this).acquireClient();
                 // bind statements with schema and client but do not auto-release client
                 // as it will be reused in the current transaction.
                 const statements = bindStatements(this.#rawStatements, client);
@@ -68,20 +66,20 @@ export const databaseManagerPolicy = ({
                 };
                 transact.isTransact = true;
 
-                let self = this;
-                transact = bindOnAfterMethods(transact,
-                    {
-                        onCommit() {
-                            self.#transact = null;
-                        },
-                        onRollback() {
-                            self.#transact = null;
-                        }
-                    });
+                // let self = this;
+                // transact = bindOnAfterMethods(transact,
+                //     {
+                //         onCommit() {
+                //             self.#transact = null;
+                //         },
+                //         onRollback() {
+                //             self.#transact = null;
+                //         }
+                //     });
+                //
+                // this.#transact = transact;
 
-                this.#transact = transact;
-
-                Object.defineProperty(this.#transact, "schema", {
+                Object.defineProperty(transact, "schema", {
                     enumerable: true,
                     configurable: false,
                     get: () => this.schema,
@@ -90,8 +88,8 @@ export const databaseManagerPolicy = ({
                 return transact;
             };
 
-            statements.transact = async callback => {
-                let transact = await statements.beginTransact();
+            database.transact = async callback => {
+                let transact = await database.beginTransact();
                 try {
                     const result = await callback(transact);
                     await transact.commit();
@@ -102,7 +100,7 @@ export const databaseManagerPolicy = ({
                 }
             }
 
-            this.#database = statements;
+            this.#database = database;
 
             Object.defineProperty(this.#database, "schema", {
                 enumerable: true,
@@ -113,20 +111,20 @@ export const databaseManagerPolicy = ({
             return this;
         }
 
-        getCurrentTransaction() {
-            return this.#transact;
-        }
+        // getCurrentTransaction() {
+        //     return this.#transact;
+        // }
 
         getDatabase() {
             if (!this.#database) {
-                this.initialize();
+                this.#createDatabase();
             }
             return this.#database;
         }
 
         bindStatements(statements) {
             this.#rawStatements = statements;
-            this.#boundStatements = bindStatements(statements, () => this.#pool.acquireClient());
+            this.#boundStatements = bindStatements(statements, () => getClientProvider(this).acquireClient());
             return this;
         }
 

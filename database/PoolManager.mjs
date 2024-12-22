@@ -1,15 +1,10 @@
 import {retry} from "velor-utils/utils/functional.mjs";
 import {createConnectionPool as createConnectionPoolFct} from "./impl/postgres.mjs";
-import {isTrue} from "velor-utils/utils/predicates.mjs";
-import {noOpLogger} from "velor-utils/utils/noOpLogger.mjs";
-import {acquireClient as acquireClientFct} from "./acquireClient.mjs";
+import {getLogger} from "velor-services/application/services/services.mjs";
 
 
 export const poolManagerPolicy = ({
-                                      logQueries = isTrue(process.env.LOG_DATABASE_QUERIES),
                                       createConnectionPool = createConnectionPoolFct,
-                                      getLogger = () => noOpLogger,
-                                      acquireClient = acquireClientFct
                                   } = {}) => {
     return class PoolManager {
         #pool;
@@ -20,14 +15,6 @@ export const poolManagerPolicy = ({
             this.#pool = null;
             this.#acquiredCount = 0;
             this.#connectionString = connectionString;
-        }
-
-        async acquireClient() {
-            return await acquireClient(this.getConnectionPool(),
-                {
-                    logQueries,
-                    getLogger
-                });
         }
 
         connect() {

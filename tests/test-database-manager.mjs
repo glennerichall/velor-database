@@ -1,12 +1,19 @@
 import {setupTestContext} from "velor-utils/test/setupTestContext.mjs";
 import sinon from "sinon";
 import {databaseManagerPolicy} from "../database/DatabaseManager.mjs";
-import {ClientLogger} from "../database/ClientLogger.mjs";
-import {ClientProfiler} from "../database/ClientProfiler.mjs";
-import {noOpLogger} from "velor-utils/utils/noOpLogger.mjs";
 import {timeoutAsync} from "velor-utils/utils/sync.mjs";
 import {noOp} from "velor-utils/utils/functional.mjs";
 import {poolManagerPolicy} from "../database/PoolManager.mjs";
+import {
+    getInstanceBinder,
+    getServiceBinder
+} from "velor-services/injection/ServicesContext.mjs";
+import {ClientProvider} from "../database/ClientProvider.mjs";
+import {s_logger} from "velor-services/application/services/serviceKeys.mjs";
+import {
+    s_clientProvider,
+    s_poolManager
+} from "../application/services/serviceKeys.mjs";
 
 const {
     expect,
@@ -20,107 +27,68 @@ const {
 describe('DatabaseManager', function () {
     let DatabaseManagerMock;
     let dbManager;
-    let logQueries, createConnectionPool, beginTransact,
-        bindStatements, queryRaw, getLogger;
+    let createConnectionPool;
+    let beginTransact,
+        bindStatements;
+
+    let logger, provider, mockClient, poolManager;
 
     beforeEach(function () {
-        logQueries = false;
         createConnectionPool = sinon.stub();
-        beginTransact = sinon.stub();
-        bindStatements = sinon.stub();
-        queryRaw = sinon.stub();
-        getLogger = sinon.stub().returns(noOpLogger);
-        DatabaseManagerMock = databaseManagerPolicy({
-            logQueries, createConnectionPool, beginTransact,
-            bindStatements, queryRaw, getLogger
+
+        DatabaseManagerMock = databaseManagerPolicy();
+
+        logger = {
+            debug: sinon.stub(),
+            warn: sinon.stub(),
+            error: sinon.stub(),
+        };
+
+        mockClient = {
+            query: sinon.stub(),
+            release: sinon.stub(),
+        };
+
+
+        poolManager = {
+            connect: sinon.stub().resolves(mockClient)
+        };
+
+        provider = getServiceBinder().createInstance(ClientProvider, {
+            profileQueries: true
         });
+
+        dbManager = getServiceBinder().createInstance(DatabaseManagerMock, 'schema-name');
+
+        getInstanceBinder(dbManager)
+            .setInstance(s_logger, logger)
+            .setInstance(s_poolManager, poolManager)
+            .setInstance(s_clientProvider, provider);
+
+        getInstanceBinder(provider)
+            .setInstance(s_logger, logger)
+            .setInstance(s_poolManager, poolManager);
     });
 
 
     describe('initialize', () => {
         it('constructor should initialize expected properties', function () {
-            dbManager = new DatabaseManagerMock("schema", "connectionString");
+            dbManager = new DatabaseManagerMock("schema");
             expect(dbManager).to.have.property('schema').to.equal("schema");
-        });
-
-        it('Should correctly initialize a DatabaseManager', async function () {
-
-            let error;
-            try {
-                const dbm = await new DatabaseManagerMock('schema', 'connectionString').initialize();
-            } catch (err) {
-                error = err;
-            }
-
-            expect(error).to.be.an('error');
-            expect(error.message).to.equal('Missing boundStatements');
-        });
-
-        it('getDatabase() should correctly initialize the database when it is null initially', async function () {
-            const dbManager = new DatabaseManagerMock('schema', 'connection');
-            const initializeSpy = sinon.spy(dbManager, 'initialize');
-            bindStatements.returns({})
-            dbManager.bindStatements({})
-            dbManager.getDatabase();
-            expect(initializeSpy).to.have.been.calledOnce;
-        });
-
-        it('getDatabase() should NOT call initialize when database is already set', function () {
-            dbManager = new DatabaseManagerMock('schema', 'connection');
-            bindStatements.returns({})
-            dbManager.bindStatements({})
-            dbManager.initialize();
-            const initializeSpy = sinon.spy(dbManager, 'initialize');
-            dbManager.getDatabase();
-            expect(initializeSpy).to.have.not.been.called;
         });
 
     })
 
     describe('acquireClient', () => {
-        it('Should correctly create ClientLogger object when logQueries is true', async function () {
-            const PoolManagerMock = poolManagerPolicy({logQueries: true, createConnectionPool});
-            const pool = new PoolManagerMock('connection');
 
-            createConnectionPool.returns({
-                on() {
-                },
-                connect() {
-                    return {}
-                }
-            })
-            const acquireClientResult = await pool.acquireClient();
-            expect(acquireClientResult).to.be.instanceOf(ClientLogger);
-        });
-
-        it('Should correctly create ClientProfiler object when logQueries is false', async function () {
-            const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
-            const pool = new PoolManagerMock('connection');
-            createConnectionPool.returns({
-                on() {
-                },
-                connect() {
-                    return {}
-                }
-            })
-            const acquireClientResult = await pool.acquireClient();
-            expect(acquireClientResult).to.be.instanceOf(ClientProfiler);
-        });
 
         it('Should throw exception when getConnectionPool.connect throws an exception', async function () {
-            const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
-            const pool = new PoolManagerMock('connection');
             const testError = new Error("Test Exception");
-
-            sinon.stub(pool, "getConnectionPool").returns({
-                connect: () => {
-                    throw testError;
-                }
-            });
+            poolManager.connect.throws(testError);
 
             let error;
             try {
-                await pool.acquireClient();
+                await provider.acquireClient();
             } catch (e) {
                 error = e;
             }
@@ -130,7 +98,6 @@ describe('DatabaseManager', function () {
     })
 
     it('Should correctly bind statements', function () {
-        const dbManager = new DatabaseManagerMock('schema', 'connection');
         const statements = {
             users: {
                 getUsersByPlace: sinon.stub(),
@@ -140,103 +107,76 @@ describe('DatabaseManager', function () {
                 getPlaces: sinon.stub()
             }
         };
-        dbManager.bindStatements(statements);
+        let bindStatements = sinon.stub();
+        new (databaseManagerPolicy({
+            bindStatements
+        }))().bindStatements(statements);
         expect(bindStatements).to.have.been.called;
         expect(bindStatements).calledWith(statements);
     });
 
     it('Should not throw on close pool if pool is null', async function () {
-        const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
+        const PoolManagerMock = poolManagerPolicy({createConnectionPool});
         const pool = new PoolManagerMock('connection');
         await pool.closeDBClientPool();
     });
 
     describe('getConnectionPool', () => {
         it('connect() should correctly call getConnectionPool', function () {
-            const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
+            const PoolManagerMock = poolManagerPolicy({createConnectionPool});
             const pool = new PoolManagerMock('connection');
             const getConnectionPoolSpy = sinon.stub(pool, 'getConnectionPool');
             pool.connect();
             expect(getConnectionPoolSpy).to.have.been.called;
         });
 
-        it('Should correctly get a connection pool if not present', function () {
-            const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
-            const pool = new PoolManagerMock('connection');
-            createConnectionPool.returns({
-                on() {
-                }
-            })
-            pool.getConnectionPool();
-            pool.getConnectionPool();
-            expect(createConnectionPool).calledOnce;
-        });
-
         it('Should not retry connection pool connection on client acquire if unknown error', async function () {
-            const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
-            const pool = new PoolManagerMock('connection');
 
             let err = new Error();
-            let connect = sinon.stub().throws(err);
-            createConnectionPool.returns({
-                on(event, listener) {
-                },
-                connect
-            })
+            poolManager.connect.throws(err);
+
             let error;
             try {
-                await pool.acquireClient();
+                await provider.acquireClient();
             } catch (e) {
                 error = e;
             }
             expect(error).to.be.an.instanceof(Error);
             expect(error.code).to.eq(err.code);
 
-            expect(connect).calledOnce;
+            expect(poolManager.connect).calledOnce;
 
         });
 
         it('Should retry connection pool connection on client acquire', async function () {
-            const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
-            const pool = new PoolManagerMock('connection');
 
             let err = new Error();
             err.code = '53300';
-            createConnectionPool.returns({
-                on(event, listener) {
-                },
-                connect: sinon.stub().onFirstCall().throws(err)
-                    .onSecondCall().throws(err)
-                    .onThirdCall().resolves()
-            })
-            let client = pool.acquireClient();
+
+            poolManager.connect.onFirstCall().throws(err)
+                .onSecondCall().throws(err)
+                .onThirdCall().resolves();
+
+            let client = await provider.acquireClient();
             expect(client).to.not.be.null;
 
         });
 
         it('Should retry connection pool connection at ax 3 times on client acquire', async function () {
-            const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
-            const pool = new PoolManagerMock('connection');
-
             let err = new Error();
             err.code = '53300';
 
-            let connect = sinon.stub().throws(err);
-            createConnectionPool.returns({
-                on(event, listener) {
-                },
-                connect
-            })
+            poolManager.connect.throws(err);
             let error;
             try {
-                await pool.acquireClient();
+                await provider.acquireClient();
             } catch (e) {
                 error = e;
             }
             expect(error).to.be.an.instanceof(Error);
             expect(error.code).to.eq(err.code);
 
-            expect(connect).callCount(4);
+            expect(poolManager.connect).callCount(4);
 
         });
 
@@ -244,38 +184,14 @@ describe('DatabaseManager', function () {
 
     describe('database', () => {
         let database, client;
-        beforeEach(function () {
-            const DatabaseManagerMock = databaseManagerPolicy({getLogger})
-            const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
-            dbManager = new DatabaseManagerMock('schema-name', new PoolManagerMock('connection'));
-            client = {
-                query: sinon.stub().resolves({
-                    rows: [{}]
-                }),
-                release: sinon.stub()
-            };
-            let pool = {
-                on: sinon.stub(),
-                connect: sinon.stub().resolves(client)
-            };
-            createConnectionPool.returns(pool);
-        })
 
         it('should get database', async () => {
-            const dbManager = new DatabaseManagerMock('schema-name', 'connection');
-            let client = {};
-            let pool = {
-                on: sinon.stub(),
-                connect: sinon.stub().resolves(client)
-            };
-            createConnectionPool.returns(pool);
-
             let statements = {
                 users: {
                     getUserByPlace: sinon.stub()
                 }
             };
-            bindStatements.returns(statements);
+
             dbManager.bindStatements(statements);
             let database = dbManager.getDatabase();
 
@@ -294,12 +210,12 @@ describe('DatabaseManager', function () {
             let args = [1, 34];
             let sql = 'select * from users';
             await database.queryRaw(sql, args);
-            expect(client.query).calledWith(sql, args);
-            expect(client.release).calledOnce;
+            expect(mockClient.query).calledWith(sql, args);
+            expect(mockClient.release).calledOnce;
         })
 
         it('should database close pool', async () => {
-            const PoolManagerMock = poolManagerPolicy({logQueries, createConnectionPool});
+            const PoolManagerMock = poolManagerPolicy({createConnectionPool});
             const pool = new PoolManagerMock('connection');
 
             sinon.spy(pool, 'closeDBClientPool');
@@ -315,7 +231,6 @@ describe('DatabaseManager', function () {
                         getUserByPlace: sinon.stub()
                     }
                 };
-                bindStatements.returns(statements);
                 dbManager.bindStatements(statements);
                 let database = dbManager.getDatabase();
                 let transact = await database.beginTransact();
@@ -333,7 +248,7 @@ describe('DatabaseManager', function () {
                 dbManager.bindStatements({});
                 let database = dbManager.getDatabase();
                 await database.beginTransact();
-                expect(client.query).calledWith('BEGIN');
+                expect(mockClient.query).calledWith('BEGIN');
             })
 
             it('should call client with args', async () => {
@@ -352,8 +267,8 @@ describe('DatabaseManager', function () {
 
                 await transact.users.getUserByPlace('canada');
 
-                let argsFirstCall = client.query.args[0];
-                let argsSecondCall = client.query.args[1];
+                let argsFirstCall = mockClient.query.args[0];
+                let argsSecondCall = mockClient.query.args[1];
 
                 expect(argsFirstCall[0]).to.eq('BEGIN');
 
@@ -369,18 +284,17 @@ describe('DatabaseManager', function () {
                         getUserByPlace: sinon.stub()
                     }
                 };
-                bindStatements.returns(statements);
                 dbManager.bindStatements(statements);
                 let database = dbManager.getDatabase();
                 let transact = await database.beginTransact();
 
                 await transact.users.getUserByPlace('canada');
 
-                expect(client.release).not.called;
+                expect(mockClient.release).not.called;
 
                 transact.commit();
 
-                expect(client.release).calledOnce;
+                expect(mockClient.release).calledOnce;
             })
 
             it('should call transact callback', async () => {
@@ -406,9 +320,9 @@ describe('DatabaseManager', function () {
                 dbManager.bindStatements({});
                 let database = dbManager.getDatabase();
                 await database.transact(noOp);
-                expect(client.query.getCall(0)).calledWith('BEGIN');
-                expect(client.query.getCall(1)).calledWith('COMMIT');
-                expect(client.release).calledOnce;
+                expect(mockClient.query.getCall(0)).calledWith('BEGIN');
+                expect(mockClient.query.getCall(1)).calledWith('COMMIT');
+                expect(mockClient.release).calledOnce;
             })
 
             it('should auto-rollback transaction on error with callback', async () => {
@@ -423,9 +337,9 @@ describe('DatabaseManager', function () {
                     error = e;
                 }
                 expect(error).to.be.instanceOf(Error);
-                expect(client.query.getCall(0)).calledWith('BEGIN');
-                expect(client.query.getCall(1)).calledWith('ROLLBACK');
-                expect(client.release).calledOnce;
+                expect(mockClient.query.getCall(0)).calledWith('BEGIN');
+                expect(mockClient.query.getCall(1)).calledWith('ROLLBACK');
+                expect(mockClient.release).calledOnce;
             })
         })
 

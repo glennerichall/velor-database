@@ -1,7 +1,14 @@
 import {setupTestContext} from "velor-utils/test/setupTestContext.mjs";
 import sinon from "sinon";
-import {ClientProfiler} from "../database/ClientProfiler.mjs";
 import {Timer} from "velor-utils/utils/Timer.mjs";
+import {ClientProvider} from "../database/ClientProvider.mjs";
+import {
+    createAppServicesInstance,
+    getInstanceBinder,
+    getServiceBinder
+} from "velor-services/injection/ServicesContext.mjs";
+import {s_poolManager} from "../application/services/serviceKeys.mjs";
+import {s_logger} from "velor-services/application/services/serviceKeys.mjs";
 
 const {
     expect,
@@ -17,11 +24,18 @@ describe('ClientProfiler', function () {
     let clientProfiler;
     let mockClient;
     let mockTimer;
+    let poolManager;
+    let provider;
+    let logger;
 
-    beforeEach(function () {
+    beforeEach(async () => {
         sandbox = sinon.createSandbox();
 
-        // Stubbing the release method of the client
+        logger = {
+            debug: sinon.stub(),
+            warn: sinon.stub(),
+        };
+
         mockClient = {
             release: sandbox.stub(),
             query: sandbox.stub().resolves('query result')
@@ -32,8 +46,21 @@ describe('ClientProfiler', function () {
         };
         Timer.start = () => mockTimer;
 
-        clientProfiler = new ClientProfiler(mockClient);
+
         sandbox.stub(console, 'debug');
+
+        poolManager = {connect: sinon.stub().resolves(mockClient)};
+
+        provider = getServiceBinder().createInstance(ClientProvider, {
+            profileQueries: true
+        });
+
+        getInstanceBinder(provider)
+            .setInstance(s_logger, logger)
+            .setInstance(s_poolManager, poolManager);
+
+
+        clientProfiler = await provider.acquireClient();
     });
 
     afterEach(function () {
@@ -47,17 +74,17 @@ describe('ClientProfiler', function () {
             expect(mockClient.query).to.have.been.calledWith('query', ['arg']);
         });
 
-        it('should log output if span > 4000 ', async function () {
+        it('should log output if span >= 4000 ', async function () {
 
-            mockTimer.stop.returns(4001);
-            await clientProfiler.query('query', ['arg']);
-            expect(console.debug).to.have.been.calledWith('Database query (ms)', 4001);
-        });
-
-        it('should not log output if span <= 4000 ', async function () {
             mockTimer.stop.returns(4000);
             await clientProfiler.query('query', ['arg']);
-            expect(console.debug).not.to.have.been.called;
+            expect(logger.warn).to.have.been.calledWith('Database query took 4000 ms');
+        });
+
+        it('should not log output if span < 4000 ', async function () {
+            mockTimer.stop.returns(3999);
+            await clientProfiler.query('query', ['arg']);
+            expect(logger.warn).not.to.have.been.called;
         });
     });
 

@@ -1,27 +1,26 @@
 import {retry} from "velor-utils/utils/functional.mjs";
+import {ClientProxy} from "./ClientProxy.mjs";
+import {getLogger} from "velor-services/application/services/services.mjs";
 
-export class ClientRetry {
+export class ClientRetry extends ClientProxy {
+
     constructor(client) {
-        this._client = client;
+        super(client);
     }
 
-    async query(query, args) {
-        return retry(() => this._client.query(query, args), {
+    async _query(target, query, args) {
+        return retry(() => target.query(query, args), {
             retry: (err, i) => {
                 let isDeadLock = err.code === '40P01';
                 if (isDeadLock) {
                     if (i < 3) {
-                        console.debug("Deadlock detected, retrying request");
+                        getLogger(this).warn("Deadlock detected, retrying request");
                     } else {
-                        console.debug("Deadlock detected");
+                        getLogger(this).error("Deadlock detected");
                     }
                 }
                 return (isDeadLock) && i < 3;
             }
         });
-    }
-
-    release() {
-        return this._client.release()
     }
 }

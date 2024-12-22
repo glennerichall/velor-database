@@ -1,4 +1,4 @@
-export function logQuery(query, logger, args) {
+export function queryToString(query, args) {
     let q = query;
     for (let i = 0; i < args?.length; i++) {
         let arg = args[i];
@@ -7,5 +7,5 @@ export function logQuery(query, logger, args) {
         }
         q = q.replaceAll(`$${i + 1}`, arg);
     }
-    logger.debug(q);
+    return q;
 }
