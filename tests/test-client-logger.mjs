@@ -32,7 +32,11 @@ describe('ClientLogger', () => {
             release: sinon.stub()
         };
 
-        poolManager = {connect: sinon.stub().resolves(client)};
+        poolManager = {
+            connect: sinon.stub(),
+            acquireClient: sinon.stub().resolves(client),
+        };
+
         provider = getServiceBinder().createInstance(ClientProvider, {
             profileQueries: true
         });

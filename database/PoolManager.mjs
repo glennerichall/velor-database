@@ -21,6 +21,10 @@ export const poolManagerPolicy = ({
             this.getConnectionPool();
         }
 
+        acquireClient() {
+            return this.getConnectionPool().acquireClient();
+        }
+
         getConnectionPool() {
             if (this.#pool === null) {
                 getLogger(this).debug(`Creating database connection pool`);

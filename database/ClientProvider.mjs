@@ -35,7 +35,7 @@ export class ClientProvider {
     async acquireClient() {
         try {
             let pool = getPoolManager(this);
-            let client = await retry(() => pool.connect(), {
+            let client = await retry(() => pool.acquireClient(), {
                 retry: (error, i) => {
                     let isTooManyClients = error.code === '53300';
                     if (isTooManyClients) {

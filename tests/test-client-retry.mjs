@@ -38,7 +38,8 @@ describe('ClientRetry', function () {
         };
 
         let poolManager = {
-            connect: sinon.stub().resolves(mockClient)
+            connect: sinon.stub(),
+            acquireClient: sinon.stub().resolves(mockClient),
         };
 
         let provider = getServiceBinder().createInstance(ClientProvider, {

@@ -49,7 +49,10 @@ describe('ClientProfiler', function () {
 
         sandbox.stub(console, 'debug');
 
-        poolManager = {connect: sinon.stub().resolves(mockClient)};
+        poolManager = {
+            connect: sinon.stub(),
+            acquireClient: sinon.stub().resolves(mockClient),
+        };
 
         provider = getServiceBinder().createInstance(ClientProvider, {
             profileQueries: true

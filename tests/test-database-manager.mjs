@@ -51,7 +51,8 @@ describe('DatabaseManager', function () {
 
 
         poolManager = {
-            connect: sinon.stub().resolves(mockClient)
+            connect: sinon.stub(),
+            acquireClient: sinon.stub().resolves(mockClient),
         };
 
         provider = getServiceBinder().createInstance(ClientProvider, {
@@ -84,7 +85,7 @@ describe('DatabaseManager', function () {
 
         it('Should throw exception when getConnectionPool.connect throws an exception', async function () {
             const testError = new Error("Test Exception");
-            poolManager.connect.throws(testError);
+            poolManager.acquireClient.throws(testError);
 
             let error;
             try {
@@ -133,7 +134,7 @@ describe('DatabaseManager', function () {
         it('Should not retry connection pool connection on client acquire if unknown error', async function () {
 
             let err = new Error();
-            poolManager.connect.throws(err);
+            poolManager.acquireClient.throws(err);
 
             let error;
             try {
@@ -144,7 +145,7 @@ describe('DatabaseManager', function () {
             expect(error).to.be.an.instanceof(Error);
             expect(error.code).to.eq(err.code);
 
-            expect(poolManager.connect).calledOnce;
+            expect(poolManager.acquireClient).calledOnce;
 
         });
 
@@ -166,7 +167,7 @@ describe('DatabaseManager', function () {
             let err = new Error();
             err.code = '53300';
 
-            poolManager.connect.throws(err);
+            poolManager.acquireClient.throws(err);
             let error;
             try {
                 await provider.acquireClient();
@@ -176,7 +177,7 @@ describe('DatabaseManager', function () {
             expect(error).to.be.an.instanceof(Error);
             expect(error.code).to.eq(err.code);
 
-            expect(poolManager.connect).callCount(4);
+            expect(poolManager.acquireClient).callCount(4);
 
         });
 
