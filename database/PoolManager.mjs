@@ -22,7 +22,7 @@ export const poolManagerPolicy = ({
         }
 
         acquireClient() {
-            return this.getConnectionPool().acquireClient();
+            return this.getConnectionPool().connect();
         }
 
         getConnectionPool() {
