@@ -62,7 +62,7 @@ export const databaseManagerPolicy = ({
                 let transact = {
                     ...transactManager,
                     ...statements,
-                    queryRaw: (query, args) => queryRaw(client, query, args, getLogger(this))
+                    queryRaw: (query, args) => client.query(query, args)
                 };
                 transact.isTransact = true;
 
