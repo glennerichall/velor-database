@@ -1,5 +1,5 @@
-export const s_database = 'database';
-export const s_databaseManager = 'databaseManager';
-export const s_databaseStatements = 'databaseStatements';
-export const s_poolManager = 'poolManager';
-export const s_clientProvider = 'clientProvider';
+export const s_database = Symbol('database');
+export const s_databaseManager = Symbol('databaseManager');
+export const s_databaseStatements = Symbol('databaseStatements');
+export const s_poolManager = Symbol('poolManager');
+export const s_clientProvider = Symbol('clientProvider');
