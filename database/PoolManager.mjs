@@ -32,11 +32,11 @@ export const poolManagerPolicy = ({
 
                 this.#pool.on('acquire', () => {
                     this.#acquiredCount++;
-                    getLogger(this).silly(`Database client acquired [${this.schema}]: ` + this.#acquiredCount);
+                    getLogger(this).silly(`Database client acquired: ` + this.#acquiredCount);
                 });
                 this.#pool.on('release', () => {
                     this.#acquiredCount--;
-                    getLogger(this).silly(`Database client released [${this.schema}]: ` + this.#acquiredCount);
+                    getLogger(this).silly(`Database client released: ` + this.#acquiredCount);
                 });
             }
             return this.#pool;
