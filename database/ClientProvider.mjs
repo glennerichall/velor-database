@@ -11,25 +11,25 @@ import {getLogger} from "velor-services/application/services/services.mjs";
 import {Timer} from "velor-utils/utils/Timer.mjs";
 import {getServiceBinder} from "velor-services/injection/ServicesContext.mjs";
 
-export class ClientProvider {
+const kp_logQueries = Symbol();
+const kp_profileQueries = Symbol();
 
-    #logQueries;
-    #profileQueries;
+export class ClientProvider {
 
     constructor({
                     logQueries = false,
                     profileQueries = true
                 } = {}) {
-        this.#logQueries = logQueries;
-        this.#profileQueries = profileQueries;
+        this[kp_logQueries] = logQueries;
+        this[kp_profileQueries] = profileQueries;
     }
 
     set logQueries(value) {
-        this.#logQueries = value;
+        this[kp_logQueries] = value;
     }
 
     set profileQueries(value) {
-        this.#profileQueries = value;
+        this[kp_profileQueries] = value;
     }
 
     async acquireClient() {
@@ -47,14 +47,14 @@ export class ClientProvider {
             client = getServiceBinder(this)
                 .createInstance(ClientRetry, client);
 
-            if (this.#logQueries) {
+            if (this[kp_logQueries]) {
                 bindBeforeMethod(client, 'query', ({args}) => {
                     let str = queryToString(...args);
                     getLogger(this).debug(str);
                 });
             }
 
-            if (this.#profileQueries) {
+            if (this[kp_profileQueries]) {
                 let timer;
                 bindAroundAsyncMethod(client, 'query',
                     async () => {

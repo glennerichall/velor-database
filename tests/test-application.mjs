@@ -1,6 +1,8 @@
 import {setupTestContext} from "velor-utils/test/setupTestContext.mjs";
 import {
+    areSame,
     createAppServicesInstance,
+    isInstanceOf,
     isServiceAware
 } from "velor-services/injection/ServicesContext.mjs";
 import {mergeDefaultDatabaseOptions} from "../application/services/mergeDefaultDatabaseOptions.mjs";
@@ -39,10 +41,10 @@ describe('application', () => {
         let poolManager = getPoolManager(services);
 
         expect(poolManager).to.not.be.undefined;
-        expect(poolManager).to.be.an.instanceof(PoolManager);
+        expect(isInstanceOf(poolManager, PoolManager)).to.be.true;
 
         // should be a singleton
-        expect(poolManager).to.eq(getPoolManager(services));
+        expect(areSame(poolManager, getPoolManager(services))).to.be.true;
     })
 
     it('should get database', async () => {
@@ -63,6 +65,6 @@ describe('application', () => {
         expect(database).to.not.be.undefined;
 
         // should be a singleton
-        expect(database).to.eq(getDatabase(services));
+        expect(areSame(database,getDatabase(services))).to.be.true;
     })
 })

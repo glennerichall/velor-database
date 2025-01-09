@@ -1,10 +1,11 @@
 import {NotImplementedError} from "velor-utils/utils/errors/NotImplementedError.mjs";
 
+const kp_client = Symbol();
+
 export class ClientProxy {
-    #client;
 
     constructor(client) {
-        this.#client = client;
+        this[kp_client] = client;
     }
 
     _query(client, query, args) {
@@ -12,10 +13,10 @@ export class ClientProxy {
     }
 
     query(query, args) {
-        return this._query(this.#client, query, args);
+        return this._query(this[kp_client], query, args);
     }
 
     release() {
-        return this.#client.release()
+        return this[kp_client].release()
     }
 }

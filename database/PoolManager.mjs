@@ -2,19 +2,19 @@ import {retry} from "velor-utils/utils/functional.mjs";
 import {createConnectionPool as createConnectionPoolFct} from "./impl/postgres.mjs";
 import {getLogger} from "velor-services/application/services/services.mjs";
 
+const kp_pool = Symbol();
+const kp_acquiredCount = Symbol();
+const kp_connectionString = Symbol();
 
 export const poolManagerPolicy = ({
                                       createConnectionPool = createConnectionPoolFct,
                                   } = {}) => {
     return class PoolManager {
-        #pool;
-        #acquiredCount;
-        #connectionString;
 
-        constructor(connectionString, logQueries = false) {
-            this.#pool = null;
-            this.#acquiredCount = 0;
-            this.#connectionString = connectionString;
+        constructor(connectionString) {
+            this[kp_pool] = null;
+            this[kp_acquiredCount] = 0;
+            this[kp_connectionString] = connectionString;
         }
 
         connect() {
@@ -26,20 +26,20 @@ export const poolManagerPolicy = ({
         }
 
         getConnectionPool() {
-            if (this.#pool === null) {
+            if (this[kp_pool] === null) {
                 getLogger(this).debug(`Creating database connection pool`);
-                this.#pool = createConnectionPool(this.#connectionString)
+                this[kp_pool] = createConnectionPool(this[kp_connectionString])
 
-                this.#pool.on('acquire', () => {
-                    this.#acquiredCount++;
-                    getLogger(this).silly(`Database client acquired: ` + this.#acquiredCount);
+                this[kp_pool].on('acquire', () => {
+                    this[kp_acquiredCount]++;
+                    getLogger(this).silly(`Database client acquired: ` + this[kp_acquiredCount]);
                 });
-                this.#pool.on('release', () => {
-                    this.#acquiredCount--;
-                    getLogger(this).silly(`Database client released: ` + this.#acquiredCount);
+                this[kp_pool].on('release', () => {
+                    this[kp_acquiredCount]--;
+                    getLogger(this).silly(`Database client released: ` + this[kp_acquiredCount]);
                 });
             }
-            return this.#pool;
+            return this[kp_pool];
         }
 
         async close() {
@@ -48,21 +48,21 @@ export const poolManagerPolicy = ({
         }
 
         async closeDBClientPool() {
-            if (this.#pool === null) return;
+            if (this[kp_pool] === null) return;
 
             await retry(() => {
-                return this.#acquiredCount === 0 &&
-                    this.#pool.waitingCount === 0;
+                return this[kp_acquiredCount] === 0 &&
+                    this[kp_pool].waitingCount === 0;
             }, {retry: 3});
 
-            await this.#pool.end();
+            await this[kp_pool].end();
 
             await retry(() => {
-                return this.#pool.idleCount === 0;
+                return this[kp_pool].idleCount === 0;
             }, {retry: 3});
 
-            this.#pool = null;
-            this.#acquiredCount = 0;
+            this[kp_pool] = null;
+            this[kp_acquiredCount] = 0;
         }
     }
 }
